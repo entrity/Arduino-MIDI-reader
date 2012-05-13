@@ -1,0 +1,57 @@
+char foo;
+
+/*
+  (Save this as an arduino file.)
+  Hook up arduino to midi instrument
+  play midi instrument
+  serial monitor tells whether playing matches song
+*/
+
+#include <simplevector.h>
+#include <midi-listener.h>
+#include <mj_midi.h>
+#include <mj_midi-supplement.h>
+using namespace mj_midi;
+
+MidiListener * midiListener;
+
+Song * song;
+
+void songComplete() {
+  Serial.println("====== SONG COMPLETE. A WINNER IS YOU! ======");
+}
+
+void songFail() {
+  Serial.println("====== SONG FAIL ======");  
+}
+  
+
+void noteOn(unsigned char note, unsigned char volume){
+  char symbol[4] = {0,0,0,0};
+  displayNote(note, symbol);
+  Serial.print("note on: ");
+  Serial.print(symbol);
+  Serial.println(volume ? " ON" : " OFF");
+  bool ok = song->digest(note, volume);
+  Serial.println(ok);
+}
+
+void noteOff(unsigned char note){
+  Serial.println("note off");
+  bool ok = song->digest(note, 0);
+  Serial.println(ok);
+}
+
+void setup() {
+  Serial1.begin(31250);
+  Serial.begin(9600);
+  midiListener = MidiListener::init(noteOn, noteOff);
+  song = Song::fromArray(SongData);
+  song->onComplete = songComplete;
+  song->onFail = songFail;
+  Serial.println("starting...");
+}
+
+void loop() {
+  midiListener->listen();
+}
