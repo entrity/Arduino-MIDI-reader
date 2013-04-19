@@ -1,46 +1,44 @@
 #include "midi-listener.h"
 
-void MidiListener::listen()
+void MidiListener::run()
 { 
-	while (1) {
-		if (ARDUINO_INPUT.available()) {
-			handleByte(ARDUINO_INPUT.read()); }
-	}
+	if (p_input->available()) {
+		handleByte(p_input->read()); }
 }
 
-/* Callback fired when the Serial provides MidiListener with a byte of data */
-void MidiListener::handleByte(unsigned char byte)
+/* Callback fired when the Serial provides MidiListener with a byte of data.
+	Sets this->action if not set. Else, calls handleNote or handleVolume. */
+void MidiListener::handleByte(uint8_t byte)
 {
-	if ( action )
+	if ( note ) 			// the 3rd byte in the packet indicates the volume
+		handleVolume( byte );
+	else if ( action ) // the 2nd byte in the packet indicates the note
 		handleNote( byte );
-	else
+	else 							// the 1st byte in the packet indicates NOTE_ON or NOTE_OFF
 		action = byte;
 }
 
-/* Callback fired when handleByte is called and an action exists */
-void MidiListener::handleNote(unsigned char byte)
+/* Callback fired when handleByte is called and action is set.
+	Sets this-> note or fires noteOffCallback. */
+void MidiListener::handleNote(uint8_t byte)
 {
-	// if action and note are set, then all that remains is volume
-	if ( action == MIDI_NOTE_ON && note ) {
-		if (byte)
-			noteOnCallback( note, byte );
-		else // a volume value of 0 corresponds to MIDI_NOTE_OFF
-			noteOffCallback( note );
-		reset();
-	// if action is set but not note, then note shall be set
-	} else if ( action == MIDI_NOTE_ON ) {
+	if ( action == MIDI_NOTE_ON )
 		note = byte;
-	// if the action is MIDI_NOT_OFF, then the only byte left in the packet is the note to clear
-	} else if ( action == MIDI_NOTE_OFF ) {
+	else if ( action == MIDI_NOTE_OFF )
 		noteOffCallback( byte );
-	// treat this byte as the first byte of the packet
-	}	else {
+	else 	// The previous/current input packet was malformed. Treat this byte as the first byte of the packet
 		action = byte;
-	}
 }
 
-/* Clear action & note. Called after noteOnCallback */
-void MidiListener::reset()
+/* Callback fired when handleByte is called and note is set.
+	Fires noteOnCallback or noteOffCallback. Clears action and note. */
+void MidiListener::handleVolume(uint8_t byte)
 {
+	// fire a callback for NOTE_ON or NOTE_OFF
+	if (byte)	// if volume is not 0
+		noteOnCallback(note, byte);
+	else 			// volume of 0 is equivalent to MIDI_NOTE_OFF
+		noteOffCallback(note);
+	// reset
 	action = note = 0;
 }
