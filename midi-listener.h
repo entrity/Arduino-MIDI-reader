@@ -6,63 +6,41 @@
 #ifndef MJ_MIDI_LISTENER
 #define MJ_MIDI_LISTENER
 
-#define ARDUINO_INPUT Serial1
-#define NOTE_ON 144 // midi code for note on
-#define NOTE_OFF 128 // midi code for note off
+#include <Arduino.h>
+
+#define MIDI_BAUDRATE 31250 // not used
+#define MIDI_NOTE_ON 144 // midi code for note on
+#define MIDI_NOTE_OFF 128 // midi code for note off
 
 class MidiListener
 {
-	public:
-		unsigned char action, note;
-		void handleByte(unsigned char byte);
-		void handleNote(unsigned char byte);
-		void (* handleNoteOn)(unsigned char note, unsigned char volume);
-		void (* handleNoteOff)(unsigned char note);
-		void listen();
-		void reset();
-		static MidiListener * init( void (* p_noteOn)(unsigned char, unsigned char), void (* p_noteOff)(unsigned char) );
+	Stream * p_input; // the HardwareSerial or SoftwareSerial where MidiListener gets MIDI input
+	unsigned char		
+		action, // holds the first byte of a MIDI signal
+		note; 	// holds the second byte of a MIDI signal
+	void(*noteOnCallback)(uint8_t, uint8_t), // callback fired by handleNote if the MIDI input initiates a note
+	void(*noteOffCallback)(uint8_t, uint8_t), // callback fired by handleNote if the MIDI input terminates a note
+
+public:
+
+	/* Constructor */
+	MidiListener(Stream * p_input,
+		void(*noteOnCallback)(uint8_t, uint8_t),
+		void(*noteOffCallback)(uint8_t)
+		) : p_input(p_input), noteOnCallback(noteOnCallback), noteOffCallback(noteOffCallback) {}
+
+	/* Callback fired when handleByte is called and an action exists */
+	void handleByte(unsigned char byte);
+	/* Callback fired when the Serial provides MidiListener with a byte of data */
+	void handleNote(unsigned char byte);
+
+	/* Start loop that repeatedly polls p_input for MIDI input */
+	void listen();
+	/* Clear action & note. Called after noteOnCallback */
+	void reset();
 };
 
-MidiListener * MidiListener::init( void (* p_noteOn)(unsigned char, unsigned char), void (* p_noteOff)(unsigned char) )
-{
-	MidiListener * listener = new MidiListener();
-	listener->handleNoteOn = p_noteOn;
-	listener->handleNoteOff = p_noteOff;
-	return listener;
-}
-
-void MidiListener::listen()
-{
-	if (ARDUINO_INPUT.available()) { handleByte(ARDUINO_INPUT.read()); }
-}
-
-void MidiListener::handleByte(unsigned char byte)
-{
-	if ( action )
-		handleNote( byte );
-	else
-		action = byte;
-}
-
-void MidiListener::handleNote(unsigned char byte)
-{
-	if ( action == 144) {
-		if ( note )
-			{ handleNoteOn( note, byte ); reset(); }
-		else
-			{ note = byte; }
-	} else if ( action == 128 ) {
-		handleNoteOff( byte );
-	}	else
-		action = byte;
-}
-
-void MidiListener::reset()
-{
-	action = note = 0;
-}
-
-#undef NOTE_ON
-#undef NOTE_OFF
+#undef MIDI_NOTE_ON
+#undef MIDI_NOTE_OFF
 
 #endif
