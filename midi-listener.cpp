@@ -1,6 +1,6 @@
 #include "midi-listener.h"
 
-void MidiListener::run()
+void MidiListener::poll()
 { 
 	if (p_input->available()) {
 		handleByte(p_input->read()); }
