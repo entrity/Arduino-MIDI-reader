@@ -1,14 +1,14 @@
-1. Use midi.rb (and supply it a filename) to turn a midi file into a .c file which defines an MjMidi::Song.
-2. Include that .c file in your source file.
-3. Create a MidiListener, give it callbacks for MIDI_NOTE_ON and MIDI_NOTE_OFF.
-4. In loop, have MidiListener poll its Serial input.
+These modules enable the handling of midi signals over a HardwareSerial or SoftwareSerial on an Arduino.
 
-E.g.
+For barebones usage, you can simply read signals and attach callbacks to MIDI_NOTE_ON and MIDI_NOTE_OFF.
+
+For stronger usage, you can build entire songs or songbanks, which have their own callbacks for failure or completion. E.g. someone plays a MIDI keyboard, hooked up to your Arduino, and if they play a given song all the way through with no wrong notes, the completion callback which you designate for that song becomes triggered.
+
+Barebones listener example (see also the examples dir):
 
     #include <Arduino.h>
     #include <SoftwareSerial.h>
     #include "midi-listener.h"
-    #include "midi-song.h"
 
     /* callback for MidiListener */
     void noteOn( unsigned char note, unsigned char volume );
@@ -39,6 +39,6 @@ E.g.
 
     /* Send data to song */
     void noteOff( unsigned char note ) {
-        Serial.print("note off ");
+      Serial.print("note off ");
       Serial.println((int) note);
     }
