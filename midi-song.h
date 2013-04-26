@@ -40,9 +40,15 @@ namespace MjMidi
   };
 
   /* A collection of songs */
-  class Collection
+  class SongBank
   {
+    Song ** pp_songs;
+    unsigned short n;
   public:
+    /* constructor */
+    SongBank(Song ** pp_songs, unsigned short n_songs)
+      : pp_songs(pp_songs), n(n_songs) {};
+    /* call attempt on all the songs in this bank */
     void handleMidiEvent(uint8_t action, uint8_t note);
   };
 }

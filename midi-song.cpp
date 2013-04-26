@@ -70,4 +70,12 @@ namespace MjMidi
     this->completionCallback = completionCallback;
     this->failureCallback = failureCallback;
   }
+
+  /* Call attempt on all of the Songs in this SongBank */
+  void SongBank::handleMidiEvent(uint8_t action, uint8_t note)
+  {
+    for (unsigned int i = 0; i < n; i++) {
+      pp_songs[i]->attempt(action, note);
+    }
+  }
 }
