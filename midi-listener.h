@@ -41,10 +41,11 @@ class MidiListener
 public:
 
 	/* Constructor */
-	MidiListener(Stream * p_input,
+	MidiListener(
+		Stream & p_input,
 		void(*noteOnCallback) (uint8_t, uint8_t),
 		void(*noteOffCallback)(uint8_t)
-		) : p_input(p_input), noteOnCallback(noteOnCallback), noteOffCallback(noteOffCallback) {}
+		) : p_input(&p_input), noteOnCallback(noteOnCallback), noteOffCallback(noteOffCallback) {}
 
 	/* Query Serial for MIDI input. Process any available data. */
 	void poll();

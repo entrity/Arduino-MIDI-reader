@@ -10,70 +10,41 @@
 #include <Arduino.h>
 #include "midi-vars.h"
 
-enum MIDI_ATTEMPT_OUTCOME {
-  MIDI_ATTEMPT_FAILED = 0,
-  MIDI_ATTEMPT_SUCCEEDED,
-  MIDI_OBJ_COMPLETE
-};
-
-/* A MIDI_NOTE_ON or MIDI_NOTE_OFF */
-class MidiAction
+namespace MjMidi
 {
-  bool complete;
-  uint16_t n;
-  uint8_t action, note;
-public:
-  MidiAction(uint8_t action, uint8_t note) : n(0), action(action), note(note) {}
-  /* Returns this->complete */
-  bool isComplete();
-  /* Marks this object complete if there is a match */
-  uint8_t attempt(uint8_t action, uint8_t note);
-  /* Clear complete */
-  void reset();
-};
+  /* A Midi event */
+  typedef struct {
+    uint16_t offset;
+    uint8_t
+      action,
+      note;
+    bool complete;
+  } event;
 
-class MidiInstant
-{
-  bool complete;
-  uint16_t n;
-  MidiAction * p_actions; // array
-  /* Checks whether all actions are complete. Sets this->complete if so. Called by attempt(). */
-  bool checkCompletion();
-public:
-  MidiInstant(MidiAction * p_actions) : n(0), p_actions(p_actions) {}
-  /* Returns this->complete */
-  bool isComplete();
-  /* Send attempt to all incomplete actions */
-  uint8_t attempt(uint8_t action, uint8_t note);
-  /* Clear complete and reset all MidiActions */
-  void reset();
-};
+  /* A collection of Midi events */
+  class Song
+  {
+    event * p_events;
+    unsigned short i;
+    unsigned short n;
+    void(*completionCallback)(void);
+    void(*failureCallback)(void);
+  public:
+    /* constructor */
+    Song(event * p_events, unsigned short n_events)
+      : p_events(p_events), i((unsigned short) 0), n(n_events) {};
+    /* other methods */
+    void attempt(uint8_t action, uint8_t note);
+    void reset();
+    void setCallbacks(void(*completionCallback)(void), void(*failureCallback)(void));
+  };
 
-class MidiSong
-{
-  bool complete; // not really used
-  uint16_t i, n;
-  MidiInstant * p_instants; // array
-  void (* completionCallback)(void);
-public:
-  MidiSong(MidiInstant * p_instants, void(* callback)(void))
-    : i(0), n(0), p_instants(p_instants), completionCallback(callback) {}
-  /* Returns this->complete. Not used. */
-  bool isComplete();
-  /* Send attempt to current instant. If this attempt completes the last instant, fire callback. */
-  uint8_t attempt(uint8_t action, uint8_t note);
-  /* Clear complete, reset index, and reset all MidiInstants */
-  void reset();
-};
-
-class MidiSongCollection
-{
-  uint16_t n;
-  MidiSong * p_songs; // array
-public:
-  MidiSongCollection(MidiSong * p_songs) : n(0), p_songs(p_songs) {}
-  /* Send attempt to every song. */
-  void attempt(uint8_t action, uint8_t note);
-};
+  /* A collection of songs */
+  class Collection
+  {
+  public:
+    void handleMidiEvent(uint8_t action, uint8_t note);
+  };
+}
 
 #endif

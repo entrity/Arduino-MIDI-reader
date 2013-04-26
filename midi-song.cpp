@@ -1,105 +1,73 @@
 #include "midi-song.h"
 
-/* Marks this object complete if there is a match */
-uint8_t MidiAction::attempt(uint8_t action, uint8_t note)
+/* return true if the given event has a matching action and note for the params */
+inline bool matchesEvent(MjMidi::event * p_event, uint8_t action, uint8_t note)
 {
-  if (action == this->action && note == this->note) {
-    complete = true;
-    return MIDI_OBJ_COMPLETE;
-  }
-  return MIDI_ATTEMPT_FAILED;
+  return p_event->action == action && p_event->note == note;
 }
 
-/* Send attempt to all incomplete actions */
-uint8_t MidiInstant::attempt(uint8_t action, uint8_t note)
+namespace MjMidi
 {
-  MidiAction * p_action;
-  // loop through MidiActions
-  for (uint16_t i = 0; i < n; i++) {
-    p_action = &p_actions[i];
-    if (!p_action->isComplete()) {
-      // if the attempt succeeds, check whether this Instant is complete and return true
-      if (p_action->attempt(action, note) == MIDI_OBJ_COMPLETE) {
-        return checkCompletion() ? MIDI_OBJ_COMPLETE : MIDI_ATTEMPT_SUCCEEDED;
+  /* Loop through events from current instant until an event is completed or the 
+    end of the instant is reached or the end of the song is reached. 
+
+    If none is completed in this attempt and the end of the instant or song is
+    reached, the song shall be reset.
+
+    If the final event is completed, the song's callback shall be fired, and the
+    song shall be reset. */
+  void Song::attempt(uint8_t action, uint8_t note)
+  {
+    bool songIsCompleteSoFar = true;
+    // loop through subsequent events in this song, breaking when there is an offset or song end
+    for (unsigned int i = this->i; i < n; i ++) {
+      // Failure (i.e. wrong midi event/note):
+      // terminate loop if the current event is offset from the current instant
+      // and this is not the first time in the loop and incomplete events are known
+      // to exist before index i.
+      if (p_events[i].offset && i != this->i && !songIsCompleteSoFar) {
+        if (failureCallback)
+          failureCallback();
+        reset();
+        return; // failure
       }
+      // Neither failure nor success:
+      // move on to next event if the current one is already complete
+      if (p_events[i].complete)
+        continue;
+      // Success:
+      // mark the current event complete if it matches the input
+      if (matchesEvent(&p_events[i], action, note)) {
+        p_events[i].complete = true;
+        // update events index i if the song is complete so far
+        if (songIsCompleteSoFar) {
+          this->i = i + 1;
+          // recognize end of song if i == n
+          if (this->i >= n) {
+            if (completionCallback)
+              completionCallback();
+            reset();
+          }
+        }
+        return; // success
+      }
+      // at least one event in the current instant was incomplete and not matched
+      songIsCompleteSoFar = false;
     }
   }
-  // if the attempt did not succeed, reset the instant
-  reset();
-  return MIDI_ATTEMPT_FAILED;
-}
 
-/* Send attempt to current instant. If this attempt completes the last instant, fire callback. */
-uint8_t MidiSong::attempt(uint8_t action, uint8_t note)
-{
-  MidiInstant * p_instant = &p_instants[i];
-  // if an instant was completed check whether this object is complete
-  switch (p_instant->attempt(action, note)) {
-  case MIDI_OBJ_COMPLETE:
-    // check whether the completed instant was the final one in this song
-    if (this->i == this->n - 1) {
-      completionCallback();
-      reset();
-      return MIDI_OBJ_COMPLETE;
+  /* Clear i. Clear .complete on all events */
+  void Song::reset()
+  {
+    this->i = 0;
+    for (unsigned int i = 0; i < this->n; i++) {
+      p_events[i].complete = false;
     }
-  case MIDI_ATTEMPT_SUCCEEDED:
-    return MIDI_ATTEMPT_SUCCEEDED;
   }
-  // if the attempt did not succeed, reset the song
-  reset();
-  return MIDI_ATTEMPT_FAILED;
-}
 
-/* Send attempt to every song. */
-void MidiSongCollection::attempt(uint8_t action, uint8_t note)
-{
-  for (uint16_t i = 0; i < n; i++) {
-    p_songs[i].attempt(action, note);
+  void Song::setCallbacks(void(*completionCallback)(void), void(*failureCallback)(void))
+  {
+    this->completionCallback = completionCallback;
+    this->failureCallback = failureCallback;
   }
-}
-
-/* Clear complete */
-void MidiAction::reset()
-{
-  complete = false;
-}
-
-/* Clear complete and reset all MidiActions */
-void MidiInstant::reset()
-{
-  // loop through MidiActions
-  for (uint16_t j = 0; j < n; j++) {
-    p_actions[j].reset();
-  }
-  // clear complete
-  complete = false;
-}
-
-/* Clear complete, reset index, and reset all MidiInstants */
-void MidiSong::reset()
-{
-  // loop through MidiInstants
-  for (uint16_t j = 0; j < n; j++) {
-    p_instants[j].reset();
-  }
-  // clear complete
-  this->complete = false;
-  // reset index
-  this->i = 0;
-}
-
-/* Checks whether all actions are complete. Sets this->complete if so. Called by attempt(). */
-bool MidiInstant::checkCompletion()
-{
-  for (uint16_t i = 0; i < n; i++) {
-    if (!p_actions[i].isComplete())
-      return false;
-  }
-  this->complete = true;
-  return true;
-}
-
-bool MidiAction::isComplete()
-{
-  return complete;
 }
